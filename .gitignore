@@ -1,0 +1,25 @@
+# Aggregation results directory
+aggregations
+*.csv
+
+# Filters file
+*.xls
+
+# Logs
+logs/
+*.log
+
+# Build files
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Environment files
+.env
+*.env
+
+# Editor/IDE files
+.vscode/
+.idea/
