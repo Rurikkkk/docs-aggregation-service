@@ -4,7 +4,7 @@ type Task struct {
 	ID       string     `bson:"_id" json:"id"`
 	Status   TaskStatus `bson:"status" json:"status"`
 	Error    error      `bson:"error,omitempty" json:"error,omitempty"`
-	Filepath string     `bson:"filepath,omitempty" json:"filepath,omitempty"`
+	Filepath string     `bson:"filepath,omitempty"`
 }
 
 type TaskStatus string

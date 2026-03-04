@@ -2,9 +2,6 @@
 aggregations
 *.csv
 
-# Filters file
-*.xls
-
 # Logs
 logs/
 *.log

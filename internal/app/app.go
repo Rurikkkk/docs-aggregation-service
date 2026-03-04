@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"docs-aggregation-service/internal/adapters/docsrepo"
-	"docs-aggregation-service/internal/adapters/filtersrepo"
+	"docs-aggregation-service/internal/adapters/filtersparser"
 	"docs-aggregation-service/internal/adapters/taskmanager"
 	"docs-aggregation-service/internal/metrics"
 	"docs-aggregation-service/internal/ui/httpserver"
@@ -26,7 +26,6 @@ type Context struct {
 	MongoDBName         string
 	DocsCollectionName  string
 	TasksCollectionName string
-	FiltersFilepath     string
 	AggregationDirpath  string
 	ServerAddr          string
 }
@@ -43,7 +42,6 @@ func NewContext() *Context {
 			MongoDBName:         getEnvOrDefault("MONGO_DB_NAME", "docs-aggregation-service"),
 			DocsCollectionName:  getEnvOrDefault("DOCS_COLLECTION_NAME", "docs"),
 			TasksCollectionName: getEnvOrDefault("TASKS_COLLECTION_NAME", "tasks"),
-			FiltersFilepath:     getEnvOrDefault("FILTERS_FILEPATH", "filters.xls"),
 			AggregationDirpath:  getEnvOrDefault("AGGREGATION_DIRPATH", "aggregations"),
 			ServerAddr:          getEnvOrDefault("SERVER_ADDR", ":8080"),
 		}
@@ -70,10 +68,10 @@ func (c *Context) HTTPServer() *http.Server {
 		return nil
 	}
 
-	filtersRepo := filtersrepo.NewFiltersRepo(c.FiltersFilepath)
+	filtersParser := filtersparser.NewFiltersParser()
 	docsRepo := docsrepo.NewDocsRepo(client, c.MongoDBName, c.DocsCollectionName)
 	taskManager := taskmanager.NewTaskManager(client, c.MongoDBName, c.TasksCollectionName)
-	aggregateUsecase := aggregate.NewAggregateUsecase(filtersRepo, docsRepo, taskManager, metrics)
+	aggregateUsecase := aggregate.NewAggregateUsecase(filtersParser, docsRepo, taskManager, metrics)
 	getStatusUsecase := getstatus.NewGetStatusUsecase(taskManager)
 	getResultUsecase := getresult.NewGetResultUsecase(taskManager)
 

@@ -2,6 +2,7 @@ package aggregate
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"strings"
 	"time"
@@ -12,27 +13,27 @@ import (
 )
 
 type AggregateUsecase struct {
-	filtersRepo FiltersRepo
-	docsRepo    DocsRepo
-	taskManager TaskManager
-	metrics     *metrics.Metrics
+	filtersParser FiltersParser
+	docsRepo      DocsRepo
+	taskManager   TaskManager
+	metrics       *metrics.Metrics
 }
 
 func NewAggregateUsecase(
-	filtersRepo FiltersRepo,
+	filtersParser FiltersParser,
 	docsRepo DocsRepo,
 	taskManager TaskManager,
 	metrics *metrics.Metrics,
 ) *AggregateUsecase {
 	return &AggregateUsecase{
-		filtersRepo: filtersRepo,
-		docsRepo:    docsRepo,
-		taskManager: taskManager,
-		metrics:     metrics,
+		filtersParser: filtersParser,
+		docsRepo:      docsRepo,
+		taskManager:   taskManager,
+		metrics:       metrics,
 	}
 }
 
-func (au *AggregateUsecase) Run(startDate, endDate time.Time) (string, error) {
+func (au *AggregateUsecase) Run(startDate, endDate time.Time, filtersReader io.ReadSeeker) (string, error) {
 	taskID := uuid.New().String()
 	err := au.taskManager.StartTask(taskID)
 	if err != nil {
@@ -43,9 +44,9 @@ func (au *AggregateUsecase) Run(startDate, endDate time.Time) (string, error) {
 	go func() {
 		log.Printf("[Task] ID %s...: started", taskID[:6])
 
-		filters, err := au.filtersRepo.GetFilters()
+		filters, err := au.filtersParser.ParseFilters(filtersReader)
 		if err != nil {
-			log.Printf("[Task] ID %s...: reading filters failed", taskID[:6])
+			log.Printf("[Task] ID %s...: parsing filters failed", taskID[:6])
 			termErr := au.taskManager.TerminateTask(taskID, err)
 			if termErr != nil {
 				log.Printf("[TASK] ID %s...: task finished with error, but terminating failed", taskID[:6])

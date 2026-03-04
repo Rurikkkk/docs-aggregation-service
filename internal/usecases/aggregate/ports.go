@@ -1,9 +1,12 @@
 package aggregate
 
-import "time"
+import (
+	"io"
+	"time"
+)
 
-type FiltersRepo interface {
-	GetFilters() ([]string, error)
+type FiltersParser interface {
+	ParseFilters(reader io.ReadSeeker) ([]string, error)
 }
 
 type DocsRepo interface {

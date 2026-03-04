@@ -1,13 +1,14 @@
 package httpserver
 
 import (
+	"io"
 	"time"
 
 	"docs-aggregation-service/internal/domains/taskdomain"
 )
 
 type AggregateUsecase interface {
-	Run(startDate, endDate time.Time) (string, error)
+	Run(startDate, endDate time.Time, filtersReader io.ReadSeeker) (string, error)
 }
 
 type GetStatusUsecase interface {

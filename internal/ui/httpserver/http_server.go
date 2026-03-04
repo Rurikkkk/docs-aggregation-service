@@ -43,9 +43,9 @@ func NewHTTPServer(
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/aggregation", httpServer.metricsMiddleware(http.HandlerFunc(httpServer.handleAggregation)))
-	mux.Handle("/aggregation/status", httpServer.metricsMiddleware(http.HandlerFunc(httpServer.handleStatus)))
-	mux.Handle("/aggregation/result", httpServer.metricsMiddleware(http.HandlerFunc(httpServer.handleResult)))
+	mux.Handle("/aggregations", httpServer.metricsMiddleware(http.HandlerFunc(httpServer.handleAggregation)))
+	mux.Handle("/aggregations/status", httpServer.metricsMiddleware(http.HandlerFunc(httpServer.handleStatus)))
+	mux.Handle("/aggregations/result", httpServer.metricsMiddleware(http.HandlerFunc(httpServer.handleResult)))
 	mux.Handle("/metrics", promhttp.HandlerFor(metrics.Registry, promhttp.HandlerOpts{}))
 
 	return &http.Server{Handler: mux}
@@ -71,8 +71,17 @@ func (s *HTTPServer) handleAggregation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	startDateString := r.URL.Query().Get("startDate")
-	endDateString := r.URL.Query().Get("endDate")
+	r.Body = http.MaxBytesReader(w, r.Body, 100<<20)
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		log.Printf("[HTTPServer] /aggregation: (400) parsing multipart failed")
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{"error": "parsing request body failed"})
+	}
+	defer r.MultipartForm.RemoveAll()
+
+	startDateString := r.FormValue("startDate")
+	endDateString := r.FormValue("endDate")
 	if startDateString == "" || endDateString == "" {
 		log.Printf("[HTTPServer] /aggregation: (400) startDate or endDate is not provided")
 		w.WriteHeader(http.StatusBadRequest)
@@ -100,7 +109,14 @@ func (s *HTTPServer) handleAggregation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	taskID, err := s.aggregateUsecase.Run(startDate, endDate)
+	filtersReader, _, err := r.FormFile("filters")
+	if err != nil {
+		log.Printf("[HTTPServer] /aggregate: (400) parsing filters file from multipart failed")
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, map[string]string{"error": "extracting filters file from request body failed"})
+	}
+
+	taskID, err := s.aggregateUsecase.Run(startDate, endDate, filtersReader)
 	if err != nil {
 		log.Printf("[HTTPServer] /aggregation: (500) internal AggregationUsecase error")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -109,7 +125,7 @@ func (s *HTTPServer) handleAggregation(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[HTTPServer] /aggregation: (202) task started (ID %s...)", taskID[:6])
 	w.WriteHeader(http.StatusAccepted)
-	writeJSON(w, map[string]string{"taskID": taskID})
+	writeJSON(w, map[string]string{"id": taskID})
 }
 
 func (s *HTTPServer) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +135,7 @@ func (s *HTTPServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	taskID := r.URL.Query().Get("taskID")
+	taskID := r.URL.Query().Get("id")
 	tasks, err := s.getStatusUsecase.Run(taskID)
 	if err != nil {
 		log.Printf("[HTTPServer] /aggregation/status: (500) internal GetStatusUsecase error")
@@ -139,7 +155,7 @@ func (s *HTTPServer) handleResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	taskID := r.URL.Query().Get("taskID")
+	taskID := r.URL.Query().Get("id")
 	if taskID == "" {
 		log.Printf("[HTTPServer] /aggregation/result: (400) taskID is not provided")
 		w.WriteHeader(http.StatusBadRequest)
